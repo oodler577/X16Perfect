@@ -78,26 +78,3 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" "$prg" "$windows" --clobber
           gh release edit "$RELEASE_TAG" --draft=false
-
-  replace-preview-package:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: package
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: X16Perfect
-          path: release-assets
-      - name: Replace the first preview's Windows ZIP
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          tag=v0.1.0-preview.1
-          windows=release-assets/dist/X16Perfect-Windows.zip
-          unzip -tq "$windows"
-          gh release upload "$tag" "$windows" --clobber
-          gh release edit "$tag" --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip. Install X16Emu R49 separately following the included README, then run RUN-WINDOWS.bat.'
