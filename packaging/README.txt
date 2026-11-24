@@ -11,6 +11,9 @@ F5 then Enter lists files. Highlight one and press 1 to retrieve it.
 Shift+F10 retrieves directly by filename.
 F10 saves. If the name already exists, press Y to replace it or Enter to keep it.
 
+Open GUIDE.WPD from a blank document with Shift+F10, or list it
+with F5 and choose 1 Retrieve. The guide covers opening, editing, and saving.
+
 Demo files:
 - FORMAT.WPD shows bold, underline, and a hard page break.
   Alt+F3 or F11 opens the inline Reveal Codes view.
@@ -18,4 +21,4 @@ Demo files:
   to keep the original text file, since F10 saves in WordPerfect format.
 
 Source and documentation:
-https://github.com/oodler577/X16Perfect
+https://github.com/oodler577/X16Perfect/wiki

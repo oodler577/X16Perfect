@@ -1,0 +1,65 @@
+# X16Perfect Quick Start
+
+This guide is a WordPerfect 5.x document that opens in X16Perfect.
+Use the arrow keys to read it. Press F11 to see the formatting
+codes around the bold headings, then F11 again to hide them.
+
+# Open a document
+
+Choose F3, then N, for a blank document. If asked to discard edits,
+press Y only when you are ready to discard them.
+
+From a blank document, press Shift+F10, type FORMAT.WPD, and
+press Enter. You can also press F5, then Enter to list files.
+Use the arrows to highlight a file, then press 1 to retrieve it.
+
+Retrieving into a nonempty document inserts the file at the
+cursor and keeps the current filename. F5 asks before inserting.
+Press F1 to cancel prompts. End any active block before opening.
+
+# Try the demonstration files
+
+FORMAT.WPD has bold, underline, and a hard page break.
+WELCOME.TXT is a plain ASCII sample. Try opening it in a blank
+document, then try inserting it into a copy of FORMAT.WPD.
+
+# Edit and format
+
+Use the arrows to move, Home for the start of the current screen
+line, Backspace to delete to the left, and Enter for a hard return.
+F4 or Tab inserts a tab. Ctrl+Enter inserts a hard page break.
+F6 toggles bold and F8 toggles underline. The editor uses colors
+to show these attributes. Alt+F3 or F11 toggles inline Reveal Codes.
+
+F12 marks a block. Move the cursor to select text, then press
+Ctrl+C to copy or Ctrl+X to cut. Press Ctrl+V to paste.
+Use Esc to clear a block. The clipboard holds up to 2 KiB.
+F2 searches forward. Shift+F2 finds and replaces a single match.
+
+# Save a copy and exit
+
+Press F10. Use Backspace to clear the suggested name, type
+MYDEMO.WPD, and press Enter. This saves an edited copy without
+replacing the demo. If a name already exists, press Y only if
+you want to replace it. Enter or N keeps the existing file.
+
+F10 saves in WordPerfect format, including after ASCII import.
+Use a new .WPD filename to keep the original .TXT file.
+Press F7 to exit. If prompted, choose whether to save and then
+press Y at the exit confirmation.
+
+# Where files go
+
+X16Perfect reads and writes on device 8. With RUN-WINDOWS.bat
+and X16Emu HostFS, that is the folder containing X16PERF.PRG.
+On hardware or with an emulated SD card, copy GUIDE.WPD and
+the demos to the same working directory on the card.
+
+# Beta limits and help
+
+Basic ASCII and a subset of unencrypted WordPerfect 5.x files
+are supported. Other files can open read-only or be rejected.
+WordPerfect 4.2 import/export and graphical page preview are
+pending. Print and Printer Setup are menu-only in this Beta.
+
+More help: https://github.com/oodler577/X16Perfect/wiki

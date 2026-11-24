@@ -6,6 +6,8 @@ X16Perfect is a native 65C02 WordPerfect-compatible editor milestone for the Com
 
 Download the [Windows build of X16Emu R49](https://github.com/X16Community/x16-emulator/releases/tag/r49) separately. Extract the X16Perfect ZIP into its own folder directly inside the emulator directory. Keep `x16emu.exe`, `rom.bin`, and the emulator DLLs together in that parent directory. Double-click `RUN-WINDOWS.bat` next to `X16PERF.PRG`. The launcher uses 8 MHz, 512 KiB of RAM, and 2× display scaling. Files opened or saved through device 8 are next to the PRG. Use F5 to list files and F10 to save.
 
+The release ZIP includes `GUIDE.WPD`. From a blank document, press Shift+F10, enter `GUIDE.WPD`, and press Enter. See the [wiki](https://github.com/oodler577/X16Perfect/wiki) for the keyboard reference, file workflows, and troubleshooting.
+
 ## Build and run
 
 With cc65 installed, run `make`. The tested compiler is Debian cc65 2.19. Run the same PRG in X16Emu R49 with its matching ROM. For example, from this directory:
@@ -52,7 +54,7 @@ See [COVERAGE.md](COVERAGE.md) for native tests and [REFERENCE.md](REFERENCE.md)
 
 ## CI packages
 
-GitHub Actions builds the native PRG and storage diagnostic on pushes and pull requests targeting `master`. The `X16Perfect` artifact contains the standalone PRG and the Windows ZIP. The ZIP contains the application and launcher.
+GitHub Actions builds the native PRG and storage diagnostic on pushes and pull requests targeting `master`. The `X16Perfect` artifact contains the standalone PRG and the Windows ZIP. The ZIP also includes the launcher, in-editor guide, and demo documents.
 
 To produce the same Windows package locally, build with `make` and run `python3 scripts/package.py dist/X16Perfect-Windows.zip`.
 

@@ -8,6 +8,25 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def guide_document(demo):
+    # Reuse the original WP5 demonstration's document prefix.
+    data = demo.read_bytes()
+    offset = int.from_bytes(data[4:8], "little")
+    if data[:4] != b"\xffWPC" or not 16 <= offset < len(data):
+        raise ValueError("Expected a WordPerfect document prefix in FORMAT.WPD")
+
+    source = ROOT / "packaging" / "guide.txt"
+    lines = []
+    for line in source.read_text(encoding="ascii").splitlines():
+        if line.startswith("# "):
+            lines.append(b"\xc3\x0c\xc3" + line[2:].encode("ascii") + b"\xc4\x0c\xc4")
+        else:
+            lines.append(line.encode("ascii"))
+
+    # WordPerfect stores a hard return as 0x0a.
+    return data[:offset] + b"\n".join(lines) + b"\n"
+
+
 def package(destination):
     bundle_files = {
         "X16PERF.PRG": ROOT / "X16PERF.PRG",
@@ -27,6 +46,7 @@ def package(destination):
                     output.writestr(name, text.encode("ascii"))
                 else:
                     output.write(path, name)
+            output.writestr("GUIDE.WPD", guide_document(bundle_files["FORMAT.WPD"]))
 
         with ZipFile(pending) as output:
             if output.testzip() is not None:
