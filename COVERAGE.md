@@ -4,10 +4,10 @@ X16Perfect is an original X16 implementation of an editable WP 5.x subset. It do
 
 | Workflow | Native coverage | Remaining work |
 |---|---|---|
-| F5 List Files | Device 8 listing and retrieve by selection | Paging, more than 24 entries, directory navigation, sorting and original prompt details |
+| F5 List Files | Device 8 pattern prompt, sorted results, option 1 retrieves, No stays in the list | Look, the other file-list actions, paging, directory navigation, and matching DOS selection and display behavior |
 | F6 Bold and F8 Underline | Inline WP on/off records with distinct screen colors | Block-specific formatting, nested styles, typographic rendering and DOS edge cases |
 | Alt+F3 / F11 Reveal Codes | Inline code view with cursor movement and record deletion | Synchronized split view, full code names, original viewport and selection behavior |
-| F10 Save / Shift+F10 Retrieve | WP 5.x subset, format validation, protected open and confirmed replacement with No as the default | Original Retrieve insertion behavior, remaining Save and Retrieve prompt details and advanced packet semantics |
+| F10 Save / Shift+F10 Retrieve | WP 5.x subset and basic ASCII, opens into a blank document, inserts at the cursor in a nonempty document, confirmed replacement with No as the default | Complete format and conversion support, full prompt field editing, ASCII export, and reference filename/path handling |
 | F7 Exit | Save decision, exit confirmation and cancel | Remaining original edge cases and exact default behavior |
 | F2 Search / Shift+F2 Replace | Literal forward search and single replacement | Backward, repeat, replace all, match options, original flow |
 | Alt+F4 Block | Mark selection and a bounded clipboard | Original move/copy menus, rectangular blocks and cross-document operations |
@@ -16,7 +16,7 @@ X16Perfect is an original X16 implementation of an editable WP 5.x subset. It do
 | Advanced editing | Some tokens visible generically or protected by read-only access | Tables, styles, columns, headers, footnotes, graphics, macros, merge, undo and proofreading |
 | WordPerfect 5.1 Plus additions | Original reference used | WP 6.x conversion, alternate conversion formats, additional file-list options, mail and fax paths |
 
-Unsupported editable document cases include extended character rendering, printer-dependent formatting, complex packet references and protected/encrypted documents. There is no complete menu-by-menu inventory of the DOS program yet.
+Unsupported editable document cases include extended character rendering, printer-dependent formatting, complex packet references and protected/encrypted documents. See [REFERENCE.md](REFERENCE.md) for the first-level DOS inventory and file-format release gate. Nested menus, key variants, and command evidence remain incomplete.
 
 ## Verification
 
@@ -28,9 +28,10 @@ Early GUI responsiveness measurements used 40 synthetic single keypresses on a b
 
 | X16Emu profile | Formatted body | Open | Stream scan | Save | Byte comparison |
 |---|---:|---:|---:|---:|---|
-| 2 MHz / 512 KiB | 128 KiB | 37.28 s | 28.45 s | 13.87 s | Passed |
-| 8 MHz / 512 KiB | 128 KiB | 8.80 s | 6.58 s | 3.93 s | Passed |
-| 8 MHz / 2 MiB | 512 KiB | 35.10 s | 26.30 s | 15.58 s | Passed |
+| 2 MHz / 512 KiB | 64 KiB | 18.70 s | 14.20 s | 7.02 s | Passed |
+| 2 MHz / 512 KiB | 128 KiB | 37.23 s | 28.38 s | 13.83 s | Passed |
+| 8 MHz / 512 KiB | 128 KiB | 8.78 s | 6.57 s | 3.92 s | Passed |
+| 8 MHz / 2 MiB | 512 KiB | 35.05 s | 26.23 s | 15.57 s | Passed |
 
 Times are KERNAL ticks divided by 60. Save timing excludes the preceding gap relocation and insert operations. The three profiles used the same storage diagnostic binary.
 
@@ -40,10 +41,18 @@ WordPerfect 5.1 Plus offers the current filename, then asks whether to replace a
 
 Build the native diagnostic with `make SAVETEST.PRG` and run it in an empty HostFS working directory or with an empty writable SD image. It creates `CHECK.WPD` and two files whose names match replacement scratch names. It verifies their contents after replacement and reports `SAVE REPLACE PASS`. The same binary passed on all three SD profiles and on HostFS at 8 MHz / 512 KiB. On a full SD image at 8 MHz / 512 KiB, replacement failed as expected and a host comparison confirmed that `FULL.WPD` remained byte-identical. Recovery after interrupted power and behavior on physical media remain unverified.
 
+### Retrieve replay
+
+DOSBox 0.74-3 ran the English 5.1 Plus media dated March 21, 1994. Shift+F10 displays a filename prompt when the block is off. An empty document opens at its start and takes the filename. Retrieval into a nonempty document inserts at the cursor, which stays before the insertion, and F10 keeps the active filename. An unnamed destination remains unnamed. F1 cancels the filename prompt. With a block active, Shift+F10 and F5 leave the selection active. A missing file leaves the document intact. The DOS reference imported the two-line ASCII fixture. X16Perfect rejects malformed WordPerfect records and unsupported binary data.
+
+In DOS, F5 first offers a directory pattern. Option 1 retrieves the selected file, with no insert confirmation for an empty document. For a nonempty document, Y inserts at the current position. Enter or No keeps the listing open. DOS also offers Look as the default action and displays directory entries. X16Perfect verifies the retrieve action against the same rules and still needs the other list actions and directory traversal.
+
+R49 HostFS editor replays verified the prompt, blank open, in-place formatted insertion, cursor and name retention, cancellation, missing and malformed inputs, block gating, F5 decline and confirm, ASCII import, and F10 default and confirmed replacement. The emulator replay used F12 to activate Block, since the emulator closes on Alt+F4. The native `RETRIEVE.PRG` diagnostic adds an insertion spanning an 8 KiB bank boundary, failed-insert preservation, and an ASCII CRLF crossing the input header boundary. Run it on a disposable empty device 8. Both the Retrieve and F10 diagnostics passed on HostFS and on SD in all three profiles, and the full-card test retained the original file byte for byte.
+
 ### DOS exchange
 
 WordPerfect 5.1 Plus opened the native editor's formatted fixture in DOSBox 0.74-3 and saved an additional character. The X16 document module then loaded that DOS-saved file from emulated SD, inserted another character and saved it. A byte comparison verified its entire 335-byte DOS prefix and every original formatting code. The returned file was retrieved and displayed by WordPerfect. An independent libwpd check verified the returned text and both attributes.
 
-While testing that return path, WordPerfect inserted retrieved content into the nonempty document at the active cursor. X16Perfect currently replaces its document after a discard prompt, a confirmed muscle-memory gap. The test covered a small bold-and-underline document. It did not establish complex-document interoperability.
+The current replay also round-tripped a combined formatted and ASCII document. DOSBox displayed the X16-created file and added a character. X16Perfect opened the DOS save, inserted another character, and saved it. The entire 335-byte DOS prefix and all existing body bytes matched. DOSBox reopened the returned file. See the format inventory for cases outside these fixtures.
 
 The preview.2 release PRG rebuilt byte for byte from a clean build. SHA-256 is `fbec2ca06a77d2d451e463fafb7b206f45772f6cd201b4427f37aa6b050b0a69`.

@@ -25,22 +25,23 @@ RUN
 
 ## Editor
 
-- F3 opens Commands. Choose R to retrieve, L for layout commands, P for Print, S for Printer Setup, or N for New. F5 opens a list of up to 24 accessible files. Enter selects a file. F1 cancels modal prompts.
+- F3 opens Commands. Choose R to retrieve, L for layout commands, P for Print, S for Printer Setup, or N for New. F5 prompts for a filename pattern. Press Enter to list up to 24 accessible files, use the arrows to highlight a file, and press 1 to retrieve it. F1 cancels modal prompts.
+- Shift+F10 retrieves by filename. In a blank document it opens the file at the start. In a nonempty document it inserts at the cursor and keeps the active filename. F5 asks for confirmation before inserting into a nonempty document.
 - F6 toggles bold and F8 toggles underline. X16Perfect represents these with text colors. Alt+F3 or F11 toggles the inline code view. Use Left/Right to move across code records and Backspace to remove a record to the left.
 - F2 performs literal forward search. Shift+F2 can replace a single match. Alt+F4 or F12 marks a block, with a 2 KiB clipboard available through Ctrl+C, Ctrl+X and Ctrl+V.
 - F10 offers the current filename. Accept it with Enter, or enter another name. If that file exists, press Y to replace it. Enter defaults to No and F1 or Esc cancels. Replacement writes a complete temporary copy before moving the original. F7 offers to save unsaved edits, then asks for exit confirmation.
 - Layout entries insert document margin records and hard page breaks. Margin fields use integer 1200ths of an inch. The editor’s screen wrap has its own dimensions.
 - Shift+F7 opens Print. Print and Printer Setup are navigable, intentionally inactive menus. They perform no output or device configuration.
 
-A banked gap buffer holds the document. A separate banked staging region protects the current buffer while another file is read and checked. The reader supports a subset of unencrypted WP 5.x documents in the single-byte character workflow. It preserves the imported prefix verbatim for editable files. Files with unsupported inline records can open read-only, and malformed records cause retrieval to fail. The preview approximates layout and may omit unsupported formatting and character glyphs.
+A banked gap buffer holds the document. A separate banked staging region protects the current buffer while another file is read and checked. The reader supports basic ASCII text and a subset of unencrypted WP 5.x documents. F10 writes a WP 5.x document after opening or inserting text. It preserves the imported prefix verbatim for editable files. Files with unsupported inline records can open read-only, and malformed records cause retrieval to fail. The preview approximates layout and may omit unsupported formatting and character glyphs.
 
 ## Document size
 
-The document body can hold 240 KiB with 512 KiB of banked RAM or 1,008 KiB with 2 MiB of banked RAM. Formatting codes count toward this body allowance. The imported WP5 prefix has a separate 8 KiB limit. The storage tests verified formatted bodies of 128 KiB with 512 KiB of RAM and 512 KiB with 2 MiB of RAM. The limits are derived from the memory layout.
+The document body can hold 240 KiB with 512 KiB of banked RAM or 1,008 KiB with 2 MiB of banked RAM. Formatting codes count toward this body allowance. The reader accepts WP5 prefixes up to 65,535 bytes. Prefix bytes beyond the first 8 KiB reserve additional whole banks from the body budget. The storage tests verified formatted bodies of 128 KiB with 512 KiB of RAM and 512 KiB with 2 MiB of RAM. The limits are derived from the memory layout.
 
 ## Verification
 
-See [COVERAGE.md](COVERAGE.md). To build the native storage diagnostic, run `make STORAGE.PRG`. It expects `BIG.WPD` on device 8. Generate a fixture with `python3 tests/make-fixture.py 128 BIG.WPD` (or use 64 or 512). The fixture must contain supported records, have more than 8192 body bytes, contain the literal `unique phrase`, and have a character token at body offset 8191. Use a disposable image without an existing `LARGEOUT.WPD`. With X16Emu add `-echo iso` to see the reported KERNAL ticks. Use `python3 tests/check-storage.py BIG.WPD LARGEOUT.WPD` to check both insertions byte for byte.
+See [COVERAGE.md](COVERAGE.md) for native tests and [REFERENCE.md](REFERENCE.md) for the DOS command and format inventory. To build the native storage diagnostic, run `make STORAGE.PRG`. It expects `BIG.WPD` on device 8. Generate a fixture with `python3 tests/make-fixture.py 128 BIG.WPD` (or use 64 or 512). The fixture must contain supported records, have more than 8192 body bytes, contain the literal `unique phrase`, and have a character token at body offset 8191. Use a disposable image without an existing `LARGEOUT.WPD`. With X16Emu add `-echo iso` to see the reported KERNAL ticks. Use `python3 tests/check-storage.py BIG.WPD LARGEOUT.WPD` to check both insertions byte for byte.
 
 ## References
 

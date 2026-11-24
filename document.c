@@ -6,7 +6,7 @@
 #define BANK (*(volatile unsigned char *)0)
 #define WINDOW ((unsigned char *)0xa000)
 #define BANK_SIZE 8192u
-#define PREFIX_MAX 8192u
+#define MIN_FLOOR (2ul * BANK_SIZE)
 #define CHANNEL 2
 #define DRIVE 8
 
@@ -102,6 +102,12 @@ static unsigned bank_span(Pos address)
     return BANK_SIZE - ((unsigned)address & (BANK_SIZE - 1));
 }
 
+static Pos body_floor(unsigned prefix)
+{
+    Pos prefix_banks_end = BANK_SIZE + (((Pos)prefix + BANK_SIZE - 1) & ~(Pos)(BANK_SIZE - 1));
+    return prefix_banks_end > MIN_FLOOR ? prefix_banks_end : MIN_FLOOR;
+}
+
 static void read_mem(Pos source, void *target, unsigned count)
 {
     BANK = (unsigned char)(source >> 13);
@@ -159,14 +165,13 @@ static void move_gap(Pos position)
 void doc_init(unsigned banks)
 {
     /* The second half is a staging area for opening files transactionally. */
-    floor = 2ul * BANK_SIZE;
     ceiling = (Pos)banks * BANK_SIZE / 2;
     doc_clear();
 }
 
 void doc_clear(void)
 {
-    left = floor;
+    left = floor = MIN_FLOOR;
     right = ceiling;
     prefix_size = 0;
     doc_readonly = false;
@@ -337,26 +342,110 @@ static void transfer(Pos target, Pos source, Pos count)
     }
 }
 
-bool doc_load(const char *name)
+static bool append_staged(Pos *end, Pos limit, const unsigned char *data, unsigned size)
+{
+    unsigned span;
+    if (limit - *end < size) return false;
+    while (size) {
+        span = bank_span(*end);
+        if (span > size) span = size;
+        write_mem(*end, data, span);
+        *end += span;
+        data += span;
+        size -= span;
+    }
+    return true;
+}
+
+static bool stage_text(int initial, Pos *body_size)
+{
+    static unsigned char output[256];
+    static const unsigned char tab[] = {0xc1, 2, 0, 0, 0, 0, 0, 0, 0xc1};
+    const unsigned char *data = header;
+    Pos end = ceiling, limit = ceiling + (ceiling - MIN_FLOOR);
+    bool after_cr = false, after_eof = false;
+    int size = initial, i;
+    unsigned used = 0;
+    unsigned char c;
+
+    for (;;) {
+        doc_error = "Unsupported file format";
+        for (i = 0; i < size; ++i) {
+            c = data[i];
+            if (after_eof) return false;
+            if (c == 0x1a) {
+                after_eof = true;
+                continue;
+            }
+            if (c == 10 && after_cr) {
+                after_cr = false;
+                continue;
+            }
+            after_cr = c == 13;
+            if (after_cr) c = 10;
+            if (c == 9) {
+                memcpy(output + used, tab, sizeof(tab));
+                used += sizeof(tab);
+            } else {
+                if (c != 10 && c != 12 && (c < 32 || c > 126)) return false;
+                output[used++] = c;
+            }
+            if (used > sizeof(output) - sizeof(tab)) {
+                doc_error = "Document exceeds capacity";
+                if (!append_staged(&end, limit, output, used)) return false;
+                used = 0;
+            }
+        }
+        BANK = 1;
+        size = read_data(io, sizeof(io));
+        if (size < 0) {
+            doc_error = "Read error";
+            return false;
+        }
+        if (!size) break;
+        data = io;
+    }
+
+    doc_error = "Document exceeds capacity";
+    if (!append_staged(&end, limit, output, used)) return false;
+    *body_size = end - ceiling;
+    return true;
+}
+
+static bool stage_document(const char *name, unsigned *prefix_size_out,
+                           Pos *body_size_out, bool *readonly_out)
 {
     char path[28];
     unsigned prefix, space;
     int n;
-    Pos end, stage = ceiling;
+    unsigned char opened, status;
+    Pos end, stage = ceiling, candidate_floor;
     Pos old_floor = floor, old_left = left, old_right = right, old_ceiling = ceiling;
     bool old_readonly = doc_readonly;
     doc_error = "Cannot open document";
     file_name(path, name, 'R');
     BANK = 1;
-    if (cbm_open(CHANNEL, DRIVE, CBM_READ, path)) return false;
+    opened = cbm_open(CHANNEL, DRIVE, CBM_READ, path);
+    status = disk_command("");
+    if (opened) return false;
+    if (status) goto fail;
     doc_error = "Unsupported or invalid WordPerfect file";
     n = cbm_read(CHANNEL, header, sizeof(header));
-    if (n != sizeof(header) || memcmp(header, "\xffWPC", 4) ||
-        header[6] || header[7] || header[8] != 1 || header[9] != 10 ||
+    if (n < 0) goto fail;
+    if (n < 4 || memcmp(header, "\xffWPC", 4)) {
+        bool valid = stage_text(n, body_size_out);
+        cbm_close(CHANNEL);
+        *prefix_size_out = 0;
+        *readonly_out = false;
+        return valid;
+    }
+    if (n != sizeof(header) || header[6] || header[7] || header[8] != 1 || header[9] != 10 ||
         header[10] || header[11] > 1 || header[12] || header[13])
         goto fail;
     prefix = header[4] | ((unsigned)header[5] << 8);
-    if (prefix < sizeof(header) || prefix > PREFIX_MAX) goto fail;
+    if (prefix < sizeof(header)) goto fail;
+    candidate_floor = body_floor(prefix);
+    if (candidate_floor > ceiling) goto fail;
     write_mem(stage, header, sizeof(header));
     end = stage + sizeof(header);
     doc_error = "Read error or document exceeds capacity";
@@ -367,7 +456,7 @@ bool doc_load(const char *name)
         n = read_data(io, space);
         if (n < 0) goto fail;
         if (!n) break;
-        if (end + n > stage + ceiling - floor + prefix) goto fail;
+        if (end + n > stage + ceiling - candidate_floor + prefix) goto fail;
         write_mem(end, io, n);
         end += n;
     }
@@ -382,32 +471,67 @@ bool doc_load(const char *name)
     doc_readonly = false;
     {
         bool valid = validate_body();
+        *readonly_out = doc_readonly;
+        doc_readonly = old_readonly;
         floor = old_floor;
         left = old_left;
         right = old_right;
         ceiling = old_ceiling;
         if (!valid) {
-            doc_readonly = old_readonly;
             doc_error = "Malformed WordPerfect document codes";
             return false;
         }
     }
-    if (end - stage - prefix > ceiling - floor) {
-        doc_readonly = old_readonly;
-        return false;
-    }
-
-    transfer(BANK_SIZE, stage, prefix);
-    transfer(floor, stage + prefix, end - stage - prefix);
-    left = floor + end - stage - prefix;
-    right = ceiling;
-    prefix_size = prefix;
-    doc_changed = false;
+    *prefix_size_out = prefix;
+    *body_size_out = end - stage - prefix;
     return true;
 
 fail:
     cbm_close(CHANNEL);
     return false;
+}
+
+bool doc_load(const char *name)
+{
+    unsigned prefix;
+    Pos size;
+    bool readonly;
+    if (!stage_document(name, &prefix, &size, &readonly)) return false;
+    transfer(BANK_SIZE, ceiling, prefix);
+    floor = body_floor(prefix);
+    transfer(floor, ceiling + prefix, size);
+    left = floor + size;
+    right = ceiling;
+    prefix_size = prefix;
+    doc_readonly = readonly;
+    doc_changed = false;
+    doc_error = 0;
+    return true;
+}
+
+bool doc_insert_file(const char *name, Pos position)
+{
+    unsigned prefix;
+    Pos size;
+    bool readonly;
+
+    doc_error = "Document is read-only";
+    if (doc_readonly) return false;
+    doc_error = "Invalid insertion position";
+    if (position > doc_size()) return false;
+    if (!stage_document(name, &prefix, &size, &readonly)) return false;
+    doc_error = "File uses formatting that cannot be safely inserted";
+    if (readonly) return false;
+    doc_error = "Insufficient document memory";
+    if (size > right - left) return false;
+    if (size) {
+        move_gap(floor + position);
+        transfer(left, ceiling + prefix, size);
+        left += size;
+        doc_changed = true;
+    }
+    doc_error = 0;
+    return true;
 }
 
 static unsigned char rename_file(const char *from, const char *to)

@@ -14,6 +14,7 @@ bool doc_replace(Pos first, Pos last, const void *bytes, unsigned count);
 void doc_delete(Pos first, Pos last);
 void doc_clear(void);
 bool doc_load(const char *name);
+bool doc_insert_file(const char *name, Pos position);
 typedef enum {
     DOC_SAVE_OK,
     DOC_SAVE_EXISTS,

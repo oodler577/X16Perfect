@@ -310,7 +310,7 @@ static void show_position(void)
     }
 }
 
-static bool prompt(const char *caption, char *input, unsigned char limit)
+static bool prompt_edit(const char *caption, char *input, unsigned char limit, bool replace_default)
 {
     char bar[96];
     unsigned char length = strlen(input);
@@ -330,13 +330,23 @@ static bool prompt(const char *caption, char *input, unsigned char limit)
             message("");
             return true;
         }
-        if (key == CH_DEL && length)
+        if (key == CH_DEL && length) {
             input[--length] = 0;
-        else if (key >= 32 && key <= 126 && length < limit) {
-            input[length++] = key;
-            input[length] = 0;
+            replace_default = false;
+        } else if (key >= 32 && key <= 126) {
+            if (replace_default) length = 0;
+            replace_default = false;
+            if (length < limit) {
+                input[length++] = key;
+                input[length] = 0;
+            }
         }
     }
+}
+
+static bool prompt(const char *caption, char *input, unsigned char limit)
+{
+    return prompt_edit(caption, input, limit, false);
 }
 
 static signed char decision(const char *question)
@@ -407,54 +417,99 @@ static void request_exit(void)
     if (confirm("Exit X16Perfect? (N)")) running = false;
 }
 
-static void retrieve(const char *name)
+static bool retrieve(const char *name)
 {
     if (!valid_name(name)) {
         message("Invalid filename");
-        return;
+        return false;
     }
-    if (doc_changed && !confirm("Discard edits to current document? (N)")) return;
+    if (doc_size()) {
+        if (!doc_insert_file(name, cursor)) {
+            message(doc_error);
+            return false;
+        }
+        render_from(locate_row(cursor));
+        return true;
+    }
     if (!doc_load(name)) {
         message(doc_error);
-        return;
+        return false;
     }
     strcpy(filename, name);
     cursor = mark = line_start[0] = line_attr[0] = 0;
     blocked = false;
     restore();
     if (doc_readonly) message("Unsupported formatting. Viewing is supported in read-only mode.");
+    return true;
+}
+
+static void retrieve_prompt(void)
+{
+    char name[21] = "";
+    if (!blocked && prompt("Document to be retrieved:", name, 20) && name[0])
+        retrieve(name);
+}
+
+static bool valid_pattern(const char *pattern)
+{
+    char name[21];
+    unsigned char i;
+    strcpy(name, pattern);
+    for (i = 0; name[i]; ++i)
+        if (name[i] == '*' || name[i] == '?') name[i] = 'a';
+    return valid_name(name);
 }
 
 static void list_files(void)
 {
     struct cbm_dirent entry;
     static char names[24][17];
-    char name[21];
-    unsigned char count = 0, n = 0, k;
-    if (cbm_opendir(3, 8, "$")) {
+    char pattern[21] = "*.*";
+    char path[24], title[52];
+    unsigned char count = 0, n = 0, k, at;
+    if (blocked || !prompt_edit("Dir", pattern, 20, true)) return;
+    if (!valid_pattern(pattern)) {
+        message("Enter a filename or wildcard for device 8");
+        return;
+    }
+    strcpy(path, "$:");
+    strcat(path, strcmp(pattern, "*.*") ? pattern : "*");
+    if (cbm_opendir(3, 8, path)) {
         message("Unable to read device 8");
         return;
     }
     while (count < 24 && !cbm_readdir(3, &entry)) {
         if (entry.type == CBM_T_PRG || entry.type == CBM_T_SEQ) {
-            memcpy(names[count], entry.name, 16);
-            names[count++][16] = 0;
+            at = count++;
+            while (at && strcmp(names[at - 1], entry.name) > 0) {
+                strcpy(names[at], names[at - 1]);
+                --at;
+            }
+            memcpy(names[at], entry.name, 16);
+            names[at][16] = 0;
         }
     }
     cbm_closedir(3);
-    do {
-        text_row(0, " X16Perfect | List Files", HEADER);
+    strcpy(title, " X16Perfect | Directory ");
+    strcat(title, pattern);
+    for (;;) {
+        text_row(0, title, HEADER);
         for (k = 0; k < ROWS; ++k)
-            text_row(k + 1, k < count ? names[k] : "", k == n ? CURSOR : NORMAL);
-        message(" Up/Down Select   Enter Retrieve   F1 Cancel");
+            text_row(k + 1, k < count ? names[k] : "", k == n && count ? CURSOR : NORMAL);
+        message(" 1 Retrieve   F1 Cancel");
         k = key_wait();
-        if (k == CH_CURS_UP && n) --n;
-        if (k == CH_CURS_DOWN && n + 1 < count) ++n;
-    } while (k != CH_ENTER && k != CH_F1 && k != CH_STOP && k != ESC);
-    restore();
-    if (k == CH_ENTER && count) {
-        strcpy(name, names[n]);
-        retrieve(name);
+        if ((k == CH_CURS_UP || k == CH_CURS_LEFT) && n) --n;
+        if ((k == CH_CURS_DOWN || k == CH_CURS_RIGHT) && n + 1 < count) ++n;
+        if (k == CH_F1 || k == CH_STOP || k == ESC) {
+            restore();
+            return;
+        }
+        if (k == '1' && count &&
+            (!doc_size() || confirm("Retrieve into current document? No (Yes)"))) {
+            restore();
+            retrieve(names[n]);
+            return;
+        }
     }
 }
 
@@ -607,7 +662,6 @@ static void layout(void)
 static void commands(void)
 {
     unsigned char key, row;
-    char name[21] = "";
     static const char *const items[] = {
         " F2 Search                 Shift+F10 Retrieve",
         " F4 Indent                 Alt+F4 Block",
@@ -628,7 +682,7 @@ static void commands(void)
     if (key == 'P' || key == 'p') output_menu(false);
     if (key == 'L' || key == 'l') { layout(); render_from(0); }
     if (key == 'S' || key == 's') output_menu(true);
-    if ((key == 'R' || key == 'r') && prompt("Retrieve", name, 20)) retrieve(name);
+    if (key == 'R' || key == 'r') retrieve_prompt();
     if ((key == 'N' || key == 'n') &&
         (!doc_changed || confirm("Discard edits to current document? (N)"))) {
         doc_clear();
@@ -743,7 +797,6 @@ int main(void)
     static const unsigned char tab[] = {0xc1, 2, 0, 0, 0, 0, 0, 0, 0xc1};
     unsigned char key, mod, repaint, first;
     unsigned n;
-    char name[21];
     screen_setup();
     doc_init(bank_count());
     restore();
@@ -774,10 +827,8 @@ int main(void)
             case CH_F6: attribute(12); repaint = 1; break;
             case CH_F8: attribute(14); repaint = 1; break;
             case CH_F10:
-                if (mod & 1) {
-                    name[0] = 0;
-                    if (prompt("Retrieve", name, 20)) retrieve(name);
-                } else save();
+                if (mod & 1) retrieve_prompt();
+                else save();
                 break;
             case CH_F7:
                 if (mod & 1) output_menu(false);
