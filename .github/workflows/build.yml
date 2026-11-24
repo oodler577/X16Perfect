@@ -3,6 +3,7 @@ name: Build and package
 on:
   push:
     branches: [master]
+    tags: ['v*']
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -37,3 +38,47 @@ jobs:
             dist/X16Perfect-Windows.zip
           if-no-files-found: error
           compression-level: 0
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: X16Perfect
+          path: release-assets
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          prg=release-assets/X16PERF.PRG
+          windows=release-assets/dist/X16Perfect-Windows.zip
+          test -s "$prg"
+          unzip -tq "$windows"
+
+          if release=$(gh release view "$RELEASE_TAG" --json isDraft,assets); then
+            if jq -e '.isDraft == false' <<< "$release" > /dev/null; then
+              jq -e '[.assets[].name] | contains(["X16PERF.PRG", "X16Perfect-Windows.zip"])' \
+                <<< "$release" > /dev/null
+              exit 0
+            fi
+          else
+            flags=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then
+              flags+=(--prerelease --latest=false)
+            fi
+            gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" \
+              --title "X16Perfect $RELEASE_TAG" \
+              --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip and double-click RUN-WINDOWS.bat.'
+          fi
+          gh release upload "$RELEASE_TAG" "$prg" "$windows" --clobber
+          gh release edit "$RELEASE_TAG" --draft=false

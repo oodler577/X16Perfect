@@ -56,3 +56,5 @@ See [COVERAGE.md](COVERAGE.md). To build the native storage diagnostic, run `mak
 GitHub Actions builds the native PRG and storage diagnostic on pushes and pull requests targeting `master`. The `X16Perfect` artifact contains the standalone PRG and the Windows ZIP. The workflow uses the official X16Emu R49 Windows build and verifies its SHA-256 before bundling it.
 
 To produce the same Windows package locally, build with `make` and run `python3 scripts/package.py /path/to/x16emu_win64-r49.zip dist/X16Perfect-Windows.zip`.
+
+Pushing a `v*` tag also publishes the same PRG and Windows ZIP on [GitHub Releases](https://github.com/oodler577/X16Perflect/releases). Tags with a suffix such as `-preview.1` publish as prereleases.
