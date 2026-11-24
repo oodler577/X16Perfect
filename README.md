@@ -56,4 +56,4 @@ GitHub Actions builds the native PRG and storage diagnostic on pushes and pull r
 
 To produce the same Windows package locally, build with `make` and run `python3 scripts/package.py dist/X16Perfect-Windows.zip`.
 
-Pushing a `v*` tag also publishes the same PRG and Windows ZIP on [GitHub Releases](https://github.com/oodler577/X16Perflect/releases). Tags with a suffix such as `-preview.1` publish as prereleases.
+Pushing a `v*` tag also publishes the same PRG and Windows ZIP on [GitHub Releases](https://github.com/oodler577/X16Perfect/releases). Tags with a suffix such as `-preview.1` publish as prereleases.

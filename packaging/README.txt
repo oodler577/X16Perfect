@@ -12,4 +12,4 @@ Shift+F10 retrieves directly by filename.
 F10 saves. If the name already exists, press Y to replace it or Enter to keep it.
 
 Source and documentation:
-https://github.com/oodler577/X16Perflect
+https://github.com/oodler577/X16Perfect

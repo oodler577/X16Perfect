@@ -14,7 +14,7 @@ X16Perfect is an original X16 implementation of an editable WP 5.x subset. It do
 | Page and paragraph formatting | Document margin codes, hard breaks, soft left tabs, word wrap | Full layout engine, editing form size/orientation and font metadata, indents, tab stops and page numbering |
 | Shift+F7 Print and printer setup | Navigable output and setup choices, intentionally inactive | Complete DOS submenu, prompt and cancel parity. Printing stays outside scope. |
 | Advanced editing | Some tokens visible generically or protected by read-only access | Tables, styles, columns, headers, footnotes, graphics, macros, merge, undo and proofreading |
-| WordPerfect 5.1 Plus additions | Original reference used | WP 6.x conversion, alternate conversion formats, additional file-list options, mail and fax paths |
+| WordPerfect 5.1 Plus additions | Original reference used | In-scope conversion formats, additional file-list options, mail and fax paths |
 
 Unsupported editable document cases include extended character rendering, printer-dependent formatting, complex packet references and protected/encrypted documents. See [REFERENCE.md](REFERENCE.md) for the first-level DOS inventory and file-format release gate. Nested menus, key variants, and command evidence remain incomplete.
 
@@ -24,7 +24,7 @@ R49 was run with 65C02, its matching ROM, and FAT32 SD images. The formatted smo
 
 The native storage diagnostic uses the same document module as the editor. It opens a synthetic formatted WP 5.x document from an emulated SD card, scans for a marker near the end, inserts text at the start and across an 8 KiB bank boundary, and writes a new document. A host check compares the **entire file** with the source plus the two insertions. The diagnostic scan measures a straight document scan, which is distinct from the interactive F2 workflow.
 
-Early GUI responsiveness measurements used 40 synthetic single keypresses on a blank document and observed changes in the VM's X11 framebuffer. The 2 MHz run measured about 68 ms p95, above the requested 50 ms. It observed a frame change for all 40 injections. It did not test held-key repeat, interrupted I/O, long-paragraph reflow, page-move timing or end-to-end latency on hardware. Physical display, keyboard and SD behavior require hardware testing.
+Early GUI responsiveness measurements used 40 synthetic single keypresses on a blank document and observed changes in the VM's X11 framebuffer. The 2 MHz run measured about 68 ms p95, above the requested 50 ms. It observed a frame change for all 40 injections. It did not test held-key repeat, interrupted I/O, long-paragraph reflow, page-move timing or end-to-end latency on hardware. Physical display, keyboard and SD behavior require hardware testing. A follow-up on the DC VM, timed from the X11 keyboard injection command to a changed framebuffer and the expected VERA character, observed 40/40 single strokes at p95 186.1 ms for 2 MHz / 512 KiB and 192.3 ms for 8 MHz / 512 KiB. The expanded-profile replay stopped after 14 strokes. A 1.5-second held key produced 23 characters on each completed run, with no independent count of repeat events. The measurements do not establish a pass for responsiveness, zero dropped repeats, local reflow or page moves.
 
 | X16Emu profile | Formatted body | Open | Stream scan | Save | Byte comparison |
 |---|---:|---:|---:|---:|---|
