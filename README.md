@@ -4,9 +4,8 @@ X16Perfect is a native 65C02 WordPerfect-compatible editor milestone for the Com
 
 ## Windows quick start
 
-Extract the entire ZIP to a writable folder, then double-click `RUN-WINDOWS.bat`. It launches the bundled 64-bit Windows build of X16Emu R49 at 8 MHz with 512 KiB of RAM and 2× display scaling. Files opened or saved through device 8 are in the `x16perfect` folder next to `X16PERF.PRG`. Use F5 to list files and F10 to save under a new filename. If you are upgrading from Folio/16, copy your saved documents to the new `x16perfect` folder.
+Extract the X16Perfect ZIP to a writable folder. Download the [Windows build of X16Emu R49](https://github.com/X16Community/x16-emulator/releases/tag/r49) separately and extract it into an `x16emu-r49` folder next to `RUN-WINDOWS.bat`. Place `x16emu.exe`, `rom.bin`, and the DLLs directly in that folder, then double-click the launcher. It uses 8 MHz, 512 KiB of RAM, and 2× display scaling. Files opened or saved through device 8 are in the `x16perfect` folder next to `X16PERF.PRG`. Use F5 to list files and F10 to save under a new filename. If you are upgrading from Folio/16, copy your saved documents to the new `x16perfect` folder.
 
-The emulator, its Windows runtime DLLs, and its matching ROM come from the [official X16Emu R49 release](https://github.com/X16Community/x16-emulator/releases/tag/r49).
 
 ## Build and run
 
@@ -53,8 +52,8 @@ See [COVERAGE.md](COVERAGE.md). To build the native storage diagnostic, run `mak
 
 ## CI packages
 
-GitHub Actions builds the native PRG and storage diagnostic on pushes and pull requests targeting `master`. The `X16Perfect` artifact contains the standalone PRG and the Windows ZIP. The workflow uses the official X16Emu R49 Windows build and verifies its SHA-256 before bundling it.
+GitHub Actions builds the native PRG and storage diagnostic on pushes and pull requests targeting `master`. The `X16Perfect` artifact contains the standalone PRG and the Windows ZIP. The ZIP contains the application and launcher.
 
-To produce the same Windows package locally, build with `make` and run `python3 scripts/package.py /path/to/x16emu_win64-r49.zip dist/X16Perfect-Windows.zip`.
+To produce the same Windows package locally, build with `make` and run `python3 scripts/package.py dist/X16Perfect-Windows.zip`.
 
 Pushing a `v*` tag also publishes the same PRG and Windows ZIP on [GitHub Releases](https://github.com/oodler577/X16Perflect/releases). Tags with a suffix such as `-preview.1` publish as prereleases.

@@ -25,11 +25,7 @@ jobs:
       - name: Build application and storage diagnostic
         run: make X16PERF.PRG STORAGE.PRG
       - name: Create Windows ZIP
-        run: |
-          curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/X16Community/x16-emulator/releases/download/r49/x16emu_win64-r49.zip \
-            --output "${RUNNER_TEMP}/x16emu_win64-r49.zip"
-          python3 scripts/package.py "${RUNNER_TEMP}/x16emu_win64-r49.zip" dist/X16Perfect-Windows.zip
+        run: python3 scripts/package.py dist/X16Perfect-Windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: X16Perfect
@@ -78,7 +74,30 @@ jobs:
             fi
             gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" \
               --title "X16Perfect $RELEASE_TAG" \
-              --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip and double-click RUN-WINDOWS.bat.'
+              --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip. Install X16Emu R49 separately following the included README, then run RUN-WINDOWS.bat.'
           fi
           gh release upload "$RELEASE_TAG" "$prg" "$windows" --clobber
           gh release edit "$RELEASE_TAG" --draft=false
+
+  replace-preview-package:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: X16Perfect
+          path: release-assets
+      - name: Replace the first preview's Windows ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag=v0.1.0-preview.1
+          windows=release-assets/dist/X16Perfect-Windows.zip
+          unzip -tq "$windows"
+          gh release upload "$tag" "$windows" --clobber
+          gh release edit "$tag" --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip. Install X16Emu R49 separately following the included README, then run RUN-WINDOWS.bat.'
