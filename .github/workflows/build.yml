@@ -13,7 +13,7 @@ on:
         type: string
 
 env:
-  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag || (github.event_name == 'push' && github.ref_name == 'master' && github.event.head_commit.message == 'Fix annotated Beta release publication' && 'v0.1.0-beta.1') || '' }}
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag || '' }}
 
 permissions:
   contents: read
@@ -46,15 +46,13 @@ jobs:
   release:
     if: >-
       (github.event_name == 'push' && github.ref_type == 'tag') ||
-      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') ||
-      (github.event_name == 'push' && github.ref_name == 'master' &&
-       github.event.head_commit.message == 'Fix annotated Beta release publication')
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     needs: package
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     concurrency:
-      group: release-${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || 'v0.1.0-beta.1' }}
+      group: release-${{ inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
