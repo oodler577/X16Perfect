@@ -1,0 +1,454 @@
+#include <ascii_charmap.h>
+#include "document.h"
+#include <cbm.h>
+#include <string.h>
+
+#define BANK (*(volatile unsigned char *)0)
+#define WINDOW ((unsigned char *)0xa000)
+#define BANK_SIZE 8192u
+#define PREFIX_MAX 8192u
+#define CHANNEL 2
+#define DRIVE 8
+
+static Pos floor, ceiling, left, right;
+static unsigned char io[512];
+static unsigned char header[16];
+static unsigned prefix_size;
+static const unsigned char minimal_prefix[76] = {
+    0xff, 'W', 'P', 'C', 76, 0, 0, 0, 1, 10, 0, 0, 0, 0, 0, 0,
+    0xfb, 0xff, 5, 0, 50, 0, 0, 0, 0, 0, 6, 0, 8, 0, 0, 0,
+    66, 0, 0, 0, 8, 0, 2, 0, 0, 0, 74, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 8, 0, 0x7c, 0, 0x78, 0, 0, 0, 0, 0
+};
+
+bool doc_readonly;
+bool doc_changed;
+const char *doc_error;
+
+extern int __fastcall__ read_block(unsigned char count, void *target);
+extern int __fastcall__ write_block(unsigned char count, const void *source);
+
+static int read_data(void *data, unsigned count)
+{
+    int n;
+    unsigned char flags;
+    if (cbm_k_chkin(CHANNEL)) return -1;
+    flags = cbm_k_readst();
+    if (flags) {
+        cbm_k_clrch();
+        return flags == 64 ? 0 : -1;
+    }
+    if (count > 255 && count < 512) count = 255;
+    n = read_block((unsigned char)count, data);
+    flags = cbm_k_readst();
+    cbm_k_clrch();
+    if (n < 0) return cbm_read(CHANNEL, data, count);
+    if (flags & 0xbf || n > (int)count) return -1;
+    return n;
+}
+
+static bool write_data(const unsigned char *data, unsigned count)
+{
+    unsigned chunk;
+    unsigned char flags;
+    int n;
+    if (cbm_k_ckout(CHANNEL)) return false;
+    while (count) {
+        chunk = count > 256 ? 256 : count;
+        n = write_block((unsigned char)chunk, data);
+        flags = cbm_k_readst();
+        if (n < 0) {
+            cbm_k_clrch();
+            return cbm_write(CHANNEL, data, count) == (int)count;
+        }
+        if (flags || !n || n > (int)chunk) {
+            cbm_k_clrch();
+            return false;
+        }
+        data += n;
+        count -= n;
+    }
+    cbm_k_clrch();
+    return true;
+}
+
+static void file_name(char *target, const char *name, char mode)
+{
+    target[0] = '0';
+    target[1] = ':';
+    strcpy(target + 2, name);
+    strcat(target, ",P,");
+    target[strlen(target) + 1] = 0;
+    target[strlen(target)] = mode;
+}
+
+static void disk_status(char *status)
+{
+    int count;
+    strcpy(status, "99 NO STATUS");
+    if (cbm_open(15, DRIVE, 15, "") == 0) {
+        count = cbm_read(15, status, 31);
+        if (count >= 2)
+            status[count] = 0;
+        else
+            strcpy(status, "99 NO STATUS");
+        cbm_close(15);
+    }
+}
+
+static unsigned bank_span(Pos address)
+{
+    return BANK_SIZE - ((unsigned)address & (BANK_SIZE - 1));
+}
+
+static void read_mem(Pos source, void *target, unsigned count)
+{
+    BANK = (unsigned char)(source >> 13);
+    memcpy(target, WINDOW + ((unsigned)source & (BANK_SIZE - 1)), count);
+}
+
+static void write_mem(Pos target, const void *source, unsigned count)
+{
+    BANK = (unsigned char)(target >> 13);
+    memcpy(WINDOW + ((unsigned)target & (BANK_SIZE - 1)), source, count);
+}
+
+static void move_mem(Pos target, Pos source, unsigned count)
+{
+    if ((source >> 13) == (target >> 13)) {
+        BANK = (unsigned char)(source >> 13);
+        memmove(WINDOW + ((unsigned)target & (BANK_SIZE - 1)),
+                WINDOW + ((unsigned)source & (BANK_SIZE - 1)), count);
+    } else {
+        read_mem(source, io, count);
+        write_mem(target, io, count);
+    }
+}
+
+static void move_gap(Pos position)
+{
+    Pos destination;
+    Pos source;
+    unsigned count;
+    unsigned limit;
+    while (left < position) {
+        count = sizeof(io);
+        if (position - left < count) count = (unsigned)(position - left);
+        if (bank_span(left) < count) count = bank_span(left);
+        if (bank_span(right) < count) count = bank_span(right);
+        move_mem(left, right, count);
+        left += count;
+        right += count;
+    }
+    while (left > position) {
+        count = sizeof(io);
+        if (left - position < count) count = (unsigned)(left - position);
+        limit = ((unsigned)(left - 1) & (BANK_SIZE - 1)) + 1;
+        if (limit < count) count = limit;
+        limit = ((unsigned)(right - 1) & (BANK_SIZE - 1)) + 1;
+        if (limit < count) count = limit;
+        destination = right - count;
+        source = left - count;
+        move_mem(destination, source, count);
+        left = source;
+        right = destination;
+    }
+}
+
+void doc_init(unsigned banks)
+{
+    /* The second half is a staging area for opening files transactionally. */
+    floor = 2ul * BANK_SIZE;
+    ceiling = (Pos)banks * BANK_SIZE / 2;
+    doc_clear();
+}
+
+void doc_clear(void)
+{
+    left = floor;
+    right = ceiling;
+    prefix_size = 0;
+    doc_readonly = false;
+    doc_changed = false;
+}
+
+Pos doc_size(void)
+{
+    return left - floor + ceiling - right;
+}
+
+unsigned char doc_at(Pos position)
+{
+    Pos address = position + floor;
+    if (address >= left) address += right - left;
+    BANK = (unsigned char)(address >> 13);
+    return WINDOW[(unsigned)address & (BANK_SIZE - 1)];
+}
+
+unsigned doc_copy(Pos position, void *destination, unsigned count)
+{
+    Pos address = position + floor;
+    Pos available;
+    if (address >= left) {
+        address += right - left;
+        available = ceiling - address;
+    } else {
+        available = left - address;
+    }
+    if (available < count) count = (unsigned)available;
+    if (bank_span(address) < count) count = bank_span(address);
+    if (count) read_mem(address, destination, count);
+    return count;
+}
+
+bool doc_insert(Pos position, const void *source, unsigned count)
+{
+    const unsigned char *bytes = source;
+    unsigned n;
+    if (doc_readonly || position > doc_size() || right - left < count)
+        return false;
+    move_gap(position + floor);
+    while (count) {
+        n = bank_span(left);
+        if (n > count) n = count;
+        write_mem(left, bytes, n);
+        left += n;
+        bytes += n;
+        count -= n;
+    }
+    doc_changed = true;
+    return true;
+}
+
+void doc_delete(Pos first, Pos last)
+{
+    if (doc_readonly || first >= last || last > doc_size()) return;
+    move_gap(first + floor);
+    right += last - first;
+    doc_changed = true;
+}
+
+bool doc_replace(Pos first, Pos last, const void *bytes, unsigned count)
+{
+    if (doc_readonly || first > last || last > doc_size() ||
+        right - left + last - first < count)
+        return false;
+    doc_delete(first, last);
+    return !count || doc_insert(first, bytes, count);
+}
+
+unsigned doc_token(Pos p)
+{
+    unsigned char value = doc_at(p);
+    unsigned length;
+    static const unsigned char sizes[] = {4, 9, 11, 3, 3, 5, 6, 7, 4, 5, 6, 6, 8, 10, 10, 12};
+    if (value < 0xc0) return 1;
+    if (value < 0xd0)
+        length = sizes[value - 0xc0];
+    else {
+        if (doc_size() - p < 8) return 0;
+        length = doc_at(p + 2) | ((unsigned)doc_at(p + 3) << 8);
+        if (length < 4 || length > 65531u) return 0;
+        length += 4;
+    }
+    if (doc_size() - p < length || doc_at(p + length - 1) != value) return 0;
+    if (value >= 0xd0 &&
+        (doc_at(p + 1) != doc_at(p + length - 2) ||
+         doc_at(p + 2) != doc_at(p + length - 4) ||
+         doc_at(p + 3) != doc_at(p + length - 3))) return 0;
+    return length;
+}
+
+Pos doc_previous(Pos position)
+{
+    unsigned length;
+    unsigned value;
+    if (!position) return 0;
+    value = doc_at(position - 1);
+    if (value < 0xc0) return position - 1;
+    if (value < 0xd0) {
+        for (length = 3; length <= 12 && length <= position; ++length)
+            if (doc_at(position - length) == value && doc_token(position - length) == length)
+                return position - length;
+    } else if (position >= 8) {
+        length = doc_at(position - 4) | ((unsigned)doc_at(position - 3) << 8);
+        if (length >= 4 && length <= 65531u) {
+            length += 4;
+            if (length <= position && doc_token(position - length) == length)
+                return position - length;
+        }
+    }
+    return position - 1;
+}
+
+static bool validate_body(void)
+{
+    Pos p = 0, size = doc_size();
+    unsigned n, available, index;
+    unsigned char c;
+    while (p < size) {
+        available = doc_copy(p, io, sizeof(io));
+        if (!available) return false;
+        index = 0;
+        while (index < available) {
+            c = io[index];
+            if (c >= 32 && c <= 126) {
+                ++index;
+                continue;
+            }
+            if (c >= 0xc0) {
+                n = doc_token(p + index);
+                if (!n) return false;
+                if (c != 0xc3 && c != 0xc4 &&
+                    !(c == 0xc1 && !(doc_at(p + index + 1) & 0xf4)) &&
+                    !(c == 0xd0 && n == 16 &&
+                      (doc_at(p + index + 1) == 1 || doc_at(p + index + 1) == 5)))
+                    doc_readonly = true;
+                if (n > available - index) {
+                    p += index + n;
+                    index = 0;
+                    break;
+                }
+                index += n;
+                continue;
+            }
+            if (c != 10 && c != 11 && c != 12 && c != 13 && c != 0xa0)
+                doc_readonly = true;
+            ++index;
+        }
+        p += index;
+    }
+    return true;
+}
+
+static void transfer(Pos target, Pos source, Pos count)
+{
+    unsigned n;
+    while (count) {
+        n = sizeof(io);
+        if (count < n) n = (unsigned)count;
+        if (bank_span(source) < n) n = bank_span(source);
+        if (bank_span(target) < n) n = bank_span(target);
+        move_mem(target, source, n);
+        count -= n;
+        target += n;
+        source += n;
+    }
+}
+
+bool doc_load(const char *name)
+{
+    char path[28];
+    unsigned prefix, space;
+    int n;
+    Pos end, stage = ceiling;
+    Pos old_floor = floor, old_left = left, old_right = right, old_ceiling = ceiling;
+    bool old_readonly = doc_readonly;
+    doc_error = "Cannot open document";
+    file_name(path, name, 'R');
+    BANK = 1;
+    if (cbm_open(CHANNEL, DRIVE, CBM_READ, path)) return false;
+    doc_error = "Unsupported or invalid WordPerfect file";
+    n = cbm_read(CHANNEL, header, sizeof(header));
+    if (n != sizeof(header) || memcmp(header, "\xffWPC", 4) ||
+        header[6] || header[7] || header[8] != 1 || header[9] != 10 ||
+        header[10] || header[11] > 1 || header[12] || header[13])
+        goto fail;
+    prefix = header[4] | ((unsigned)header[5] << 8);
+    if (prefix < sizeof(header) || prefix > PREFIX_MAX) goto fail;
+    write_mem(stage, header, sizeof(header));
+    end = stage + sizeof(header);
+    doc_error = "Read error or document exceeds capacity";
+    for (;;) {
+        space = bank_span(end);
+        if (space > sizeof(io)) space = sizeof(io);
+        BANK = 1;
+        n = read_data(io, space);
+        if (n < 0) goto fail;
+        if (!n) break;
+        if (end + n > stage + ceiling - floor + prefix) goto fail;
+        write_mem(end, io, n);
+        end += n;
+    }
+    cbm_close(CHANNEL);
+    if (end < stage + prefix) {
+        doc_error = "Truncated WordPerfect prefix";
+        return false;
+    }
+
+    floor = stage + prefix;
+    left = right = ceiling = end;
+    doc_readonly = false;
+    {
+        bool valid = validate_body();
+        floor = old_floor;
+        left = old_left;
+        right = old_right;
+        ceiling = old_ceiling;
+        if (!valid) {
+            doc_readonly = old_readonly;
+            doc_error = "Malformed WordPerfect document codes";
+            return false;
+        }
+    }
+    if (end - stage - prefix > ceiling - floor) {
+        doc_readonly = old_readonly;
+        return false;
+    }
+
+    transfer(BANK_SIZE, stage, prefix);
+    transfer(floor, stage + prefix, end - stage - prefix);
+    left = floor + end - stage - prefix;
+    right = ceiling;
+    prefix_size = prefix;
+    doc_changed = false;
+    return true;
+
+fail:
+    cbm_close(CHANNEL);
+    return false;
+}
+
+bool doc_save(const char *name)
+{
+    char path[28], status[32];
+    Pos p = 0;
+    unsigned n, prefix_pos = 0;
+    bool ok = true;
+    doc_error = "Document is read-only";
+    if (doc_readonly) return false;
+    doc_error = "Cannot create file or name already exists";
+    file_name(path, name, 'W');
+    BANK = 1;
+    if (cbm_open(CHANNEL, DRIVE, CBM_WRITE, path)) return false;
+    disk_status(status);
+    if (memcmp(status, "00", 2)) {
+        cbm_close(CHANNEL);
+        return false;
+    }
+    if (!prefix_size) {
+        ok = write_data(minimal_prefix, sizeof(minimal_prefix));
+    } else {
+        while (ok && prefix_pos < prefix_size) {
+            n = prefix_size - prefix_pos;
+            if (n > sizeof(io)) n = sizeof(io);
+            read_mem(BANK_SIZE + prefix_pos, io, n);
+            BANK = 1;
+            ok = write_data(io, n);
+            prefix_pos += n;
+        }
+    }
+    while (ok && p < doc_size()) {
+        n = doc_copy(p, io, sizeof(io));
+        BANK = 1;
+        ok = n && write_data(io, n);
+        p += n;
+    }
+    cbm_close(CHANNEL);
+    disk_status(status);
+    doc_error = "Write failed. Check disk and partial new file.";
+    if (!ok || memcmp(status, "00", 2)) return false;
+    doc_changed = false;
+    return true;
+}

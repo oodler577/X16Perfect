@@ -1,0 +1,39 @@
+name: Build and package
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install cc65
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y cc65
+      - name: Build application and storage diagnostic
+        run: make X16PERF.PRG STORAGE.PRG
+      - name: Create Windows ZIP
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/X16Community/x16-emulator/releases/download/r49/x16emu_win64-r49.zip \
+            --output "${RUNNER_TEMP}/x16emu_win64-r49.zip"
+          python3 scripts/package.py "${RUNNER_TEMP}/x16emu_win64-r49.zip" dist/X16Perfect-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: X16Perfect
+          path: |
+            X16PERF.PRG
+            dist/X16Perfect-Windows.zip
+          if-no-files-found: error
+          compression-level: 0

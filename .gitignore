@@ -1,0 +1,5 @@
+*.o
+*.map
+*.PRG
+/dist/
+__pycache__/
