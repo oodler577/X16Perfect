@@ -6,33 +6,25 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 
 ROOT = Path(__file__).resolve().parent.parent
-APPLICATION_FILES = (
-    "X16PERF.PRG",
-    "Makefile",
-    "README.md",
-    "COVERAGE.md",
-    "document.c",
-    "document.h",
-    "editor.c",
-    "machine.s",
-    "tests/storage.c",
-    "tests/make-fixture.py",
-    "tests/check-storage.py",
-)
 
 
 def package(destination):
-    launcher = (ROOT / "RUN-WINDOWS.bat").read_text(encoding="ascii")
-    if '-prg "X16PERF.PRG" -run' not in launcher:
-        raise ValueError("Windows launcher does not target X16PERF.PRG")
+    bundle_files = {
+        "X16PERF.PRG": ROOT / "X16PERF.PRG",
+        "RUN-WINDOWS.bat": ROOT / "RUN-WINDOWS.bat",
+        "README.txt": ROOT / "packaging" / "README.txt",
+    }
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     pending = destination.with_suffix(".tmp")
     try:
         with ZipFile(pending, "w", ZIP_DEFLATED) as output:
-            output.writestr("RUN-WINDOWS.bat", launcher.replace("\n", "\r\n").encode("ascii"))
-            for path in APPLICATION_FILES:
-                output.write(ROOT / path, f"x16perfect/{path}")
+            for name, path in bundle_files.items():
+                if name != "X16PERF.PRG":
+                    text = path.read_text(encoding="ascii").replace("\n", "\r\n")
+                    output.writestr(name, text.encode("ascii"))
+                else:
+                    output.write(path, name)
 
         with ZipFile(pending) as output:
             if output.testzip() is not None:

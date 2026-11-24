@@ -4,8 +4,7 @@ X16Perfect is a native 65C02 WordPerfect-compatible editor milestone for the Com
 
 ## Windows quick start
 
-Extract the X16Perfect ZIP to a writable folder. Download the [Windows build of X16Emu R49](https://github.com/X16Community/x16-emulator/releases/tag/r49) separately and extract it into an `x16emu-r49` folder next to `RUN-WINDOWS.bat`. Place `x16emu.exe`, `rom.bin`, and the DLLs directly in that folder, then double-click the launcher. It uses 8 MHz, 512 KiB of RAM, and 2× display scaling. Files opened or saved through device 8 are in the `x16perfect` folder next to `X16PERF.PRG`. Use F5 to list files and F10 to save under a new filename. If you are upgrading from Folio/16, copy your saved documents to the new `x16perfect` folder.
-
+Download the [Windows build of X16Emu R49](https://github.com/X16Community/x16-emulator/releases/tag/r49) separately. Extract the X16Perfect ZIP into its own folder directly inside the emulator directory. Keep `x16emu.exe`, `rom.bin`, and the emulator DLLs together in that parent directory. Double-click `RUN-WINDOWS.bat` next to `X16PERF.PRG`. The launcher uses 8 MHz, 512 KiB of RAM, and 2× display scaling. Files opened or saved through device 8 are next to the PRG. Use F5 to list files and F10 to save under a new filename.
 
 ## Build and run
 

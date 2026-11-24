@@ -1,29 +1,18 @@
 @echo off
 setlocal
-pushd "%~dp0x16perfect" || goto missing
-if not exist "X16PERF.PRG" goto incomplete
-if not exist "%~dp0x16emu-r49\x16emu.exe" goto emulator_missing
-if not exist "%~dp0x16emu-r49\rom.bin" goto emulator_missing
-"%~dp0x16emu-r49\x16emu.exe" -rom "%~dp0x16emu-r49\rom.bin" -c02 -mhz 8 -ram 512 -scale 2 -fsroot "." -prg "X16PERF.PRG" -run
-set "result=%ERRORLEVEL%"
-popd
-if not "%result%"=="0" (
-    echo X16Emu exited with code %result%.
-    pause
-)
-exit /b %result%
-
-:incomplete
-popd
+cd /d "%~dp0" || exit /b 1
+if not exist "..\x16emu.exe" goto emulator
+if not exist "..\rom.bin" goto emulator
+for %%F in (X16PERF.PRG) do if not exist "%%F" goto missing
+"..\x16emu.exe" -rom "..\rom.bin" -c02 -mhz 8 -ram 512 -fsroot . -prg X16PERF.PRG -run -scale 2
+set "RUN_RESULT=%errorlevel%"
+if not "%RUN_RESULT%"=="0" pause
+exit /b %RUN_RESULT%
 :missing
-echo Extract the entire ZIP to a folder, then double-click RUN-WINDOWS.bat.
+echo A required X16Perfect file is missing. Extract the complete runtime ZIP again.
 pause
 exit /b 1
-
-:emulator_missing
-popd
-echo Download X16Emu R49 for Windows from:
-echo https://github.com/X16Community/x16-emulator/releases/tag/r49
-echo Extract it into the x16emu-r49 folder next to this launcher.
+:emulator
+echo Place x16emu.exe and its matching rom.bin in the parent folder.
 pause
 exit /b 1

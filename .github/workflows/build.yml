@@ -74,7 +74,7 @@ jobs:
             fi
             gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" \
               --title "X16Perfect $RELEASE_TAG" \
-              --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip. Install X16Emu R49 separately following the included README, then run RUN-WINDOWS.bat.'
+              --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip into its own folder directly under your separate X16Emu R49 installation, then double-click RUN-WINDOWS.bat.'
           fi
           gh release upload "$RELEASE_TAG" "$prg" "$windows" --clobber
           gh release edit "$RELEASE_TAG" --draft=false
