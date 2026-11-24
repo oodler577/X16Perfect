@@ -83,18 +83,18 @@ static void file_name(char *target, const char *name, char mode)
     target[strlen(target)] = mode;
 }
 
-static void disk_status(char *status)
+static unsigned char disk_command(const char *command)
 {
+    char status[32];
     int count;
-    strcpy(status, "99 NO STATUS");
-    if (cbm_open(15, DRIVE, 15, "") == 0) {
-        count = cbm_read(15, status, 31);
-        if (count >= 2)
-            status[count] = 0;
-        else
-            strcpy(status, "99 NO STATUS");
-        cbm_close(15);
-    }
+    BANK = 1;
+    if (cbm_open(15, DRIVE, 15, command)) return 99;
+    count = cbm_read(15, status, sizeof(status));
+    cbm_close(15);
+    if (count < 2 || status[0] < '0' || status[0] > '9' ||
+        status[1] < '0' || status[1] > '9')
+        return 99;
+    return (status[0] - '0') * 10 + status[1] - '0';
 }
 
 static unsigned bank_span(Pos address)
@@ -410,23 +410,53 @@ fail:
     return false;
 }
 
-bool doc_save(const char *name)
+static unsigned char rename_file(const char *from, const char *to)
 {
-    char path[28], status[32];
+    char command[46];
+    strcpy(command, "R0:");
+    strcat(command, to);
+    strcat(command, "=");
+    strcat(command, from);
+    return disk_command(command);
+}
+
+static unsigned char scratch_file(const char *name)
+{
+    char command[28];
+    strcpy(command, "S0:");
+    strcat(command, name);
+    return disk_command(command);
+}
+
+static bool name_available(const char *name)
+{
+    char path[28];
+    unsigned char opened, status;
+    file_name(path, name, 'R');
+    BANK = 1;
+    opened = cbm_open(CHANNEL, DRIVE, CBM_READ, path);
+    status = disk_command("");
+    if (!opened) cbm_close(CHANNEL);
+    return status == 62;
+}
+
+static DocSaveResult write_new(const char *name, bool temporary)
+{
+    char path[28];
     Pos p = 0;
     unsigned n, prefix_pos = 0;
+    unsigned char opened, status;
     bool ok = true;
-    doc_error = "Document is read-only";
-    if (doc_readonly) return false;
     doc_error = "Cannot create file or name already exists";
     file_name(path, name, 'W');
     BANK = 1;
-    if (cbm_open(CHANNEL, DRIVE, CBM_WRITE, path)) return false;
-    disk_status(status);
-    if (memcmp(status, "00", 2)) {
-        cbm_close(CHANNEL);
-        return false;
+    opened = cbm_open(CHANNEL, DRIVE, CBM_WRITE, path);
+    status = disk_command("");
+    if (opened || status) {
+        if (!opened) cbm_close(CHANNEL);
+        return status == 63 ? DOC_SAVE_EXISTS : DOC_SAVE_FAILED;
     }
+
     if (!prefix_size) {
         ok = write_data(minimal_prefix, sizeof(minimal_prefix));
     } else {
@@ -446,9 +476,104 @@ bool doc_save(const char *name)
         p += n;
     }
     cbm_close(CHANNEL);
-    disk_status(status);
-    doc_error = "Write failed. Check disk and partial new file.";
-    if (!ok || memcmp(status, "00", 2)) return false;
-    doc_changed = false;
-    return true;
+    status = disk_command("");
+    if (ok && status == 0) return DOC_SAVE_OK;
+    if (temporary) {
+        scratch_file(name);
+        doc_error = "Write failed. Original file kept.";
+    } else {
+        doc_error = "Write failed. Check disk and partial new file.";
+    }
+    return DOC_SAVE_FAILED;
+}
+
+static bool can_replace(const char *name)
+{
+    char pattern[25];
+    struct cbm_dirent entry;
+    unsigned char result;
+    strcpy(pattern, "$:");
+    strcat(pattern, name);
+    BANK = 1;
+    if (cbm_opendir(CHANNEL, DRIVE, pattern)) return false;
+    do {
+        result = cbm_readdir(CHANNEL, &entry);
+    } while (!result && entry.type == CBM_T_HEADER);
+    cbm_closedir(CHANNEL);
+    return !result && (entry.type == CBM_T_PRG || entry.type == CBM_T_SEQ)
+        && entry.access != CBM_A_RO;
+}
+
+static DocSaveResult replace_file(const char *name)
+{
+    static char recovery[78];
+    char temporary[] = "X16P00.TMP";
+    char backup[] = "X16P00.BAK";
+    unsigned char slot, status;
+    DocSaveResult result;
+
+    if (!can_replace(name)) {
+        doc_error = "Cannot replace this file. Original kept.";
+        return DOC_SAVE_FAILED;
+    }
+
+    /* A same-directory temporary file must be closed successfully first. */
+    for (slot = 0; slot < 100; ++slot) {
+        temporary[4] = backup[4] = '0' + slot / 10;
+        temporary[5] = backup[5] = '0' + slot % 10;
+        if (!name_available(backup)) continue;
+        result = write_new(temporary, true);
+        if (result == DOC_SAVE_OK) break;
+        if (result != DOC_SAVE_EXISTS) return result;
+    }
+    if (slot == 100) {
+        doc_error = "No free temporary and backup name. Original file kept.";
+        return DOC_SAVE_FAILED;
+    }
+
+    /* HostFS can replace a rename destination. Check the backup name again. */
+    if (!name_available(backup) || rename_file(name, backup)) {
+        scratch_file(temporary);
+        doc_error = "Could not move original to backup. Replacement canceled.";
+        return DOC_SAVE_FAILED;
+    }
+
+    if (!name_available(name) || rename_file(temporary, name)) {
+        if (!name_available(name) || rename_file(backup, name)) {
+            strcpy(recovery, "Save failed. Original: ");
+            strcat(recovery, backup);
+            strcat(recovery, "  New copy: ");
+            strcat(recovery, temporary);
+            doc_error = recovery;
+        } else {
+            scratch_file(temporary);
+            doc_error = "Replacement failed. Original file restored.";
+        }
+        return DOC_SAVE_FAILED;
+    }
+
+    status = scratch_file(backup);
+    if (status != 1 && status != 0) {
+        strcpy(recovery, "Document saved. Backup kept: ");
+        strcat(recovery, backup);
+        doc_error = recovery;
+    } else {
+        doc_error = 0;
+    }
+    return DOC_SAVE_OK;
+}
+
+DocSaveResult doc_save(const char *name, bool replace_existing)
+{
+    DocSaveResult result;
+    doc_error = "Document is read-only";
+    if (doc_readonly) return DOC_SAVE_FAILED;
+    if (replace_existing) {
+        result = replace_file(name);
+    } else {
+        result = write_new(name, false);
+        if (result == DOC_SAVE_OK) doc_error = 0;
+    }
+    if (result == DOC_SAVE_OK) doc_changed = false;
+    return result;
 }

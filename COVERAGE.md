@@ -7,7 +7,7 @@ X16Perfect is an original X16 implementation of an editable WP 5.x subset. It do
 | F5 List Files | Device 8 listing and retrieve by selection | Paging, more than 24 entries, directory navigation, sorting and original prompt details |
 | F6 Bold and F8 Underline | Inline WP on/off records with distinct screen colors | Block-specific formatting, nested styles, typographic rendering and DOS edge cases |
 | Alt+F3 / F11 Reveal Codes | Inline code view with cursor movement and record deletion | Synchronized split view, full code names, original viewport and selection behavior |
-| F10 Save / Shift+F10 Retrieve | WP 5.x subset, format validation, protected open and Save As | Safe named replacement, original prompts and advanced packet semantics |
+| F10 Save / Shift+F10 Retrieve | WP 5.x subset, format validation, protected open and confirmed replacement with No as the default | Original Retrieve insertion behavior, remaining Save and Retrieve prompt details and advanced packet semantics |
 | F7 Exit | Save decision, exit confirmation and cancel | Remaining original edge cases and exact default behavior |
 | F2 Search / Shift+F2 Replace | Literal forward search and single replacement | Backward, repeat, replace all, match options, original flow |
 | Alt+F4 Block | Mark selection and a bounded clipboard | Original move/copy menus, rectangular blocks and cross-document operations |
@@ -34,10 +34,16 @@ Early GUI responsiveness measurements used 40 synthetic single keypresses on a b
 
 Times are KERNAL ticks divided by 60. Save timing excludes the preceding gap relocation and insert operations. The three profiles used the same storage diagnostic binary.
 
+### F10 replacement
+
+WordPerfect 5.1 Plus offers the current filename, then asks whether to replace an existing file with No as the default. The X16Perfect F10 replay on R49 HostFS covered a new filename, the prefilled filename, Enter, N, Esc and Y at the replacement prompt. File comparisons checked that declining or canceling kept the original bytes and that Y wrote the edited document.
+
+Build the native diagnostic with `make SAVETEST.PRG` and run it in an empty HostFS working directory or with an empty writable SD image. It creates `CHECK.WPD` and two files whose names match replacement scratch names. It verifies their contents after replacement and reports `SAVE REPLACE PASS`. The same binary passed on all three SD profiles and on HostFS at 8 MHz / 512 KiB. On a full SD image at 8 MHz / 512 KiB, replacement failed as expected and a host comparison confirmed that `FULL.WPD` remained byte-identical. Recovery after interrupted power and behavior on physical media remain unverified.
+
 ### DOS exchange
 
 WordPerfect 5.1 Plus opened the native editor's formatted fixture in DOSBox 0.74-3 and saved an additional character. The X16 document module then loaded that DOS-saved file from emulated SD, inserted another character and saved it. A byte comparison verified its entire 335-byte DOS prefix and every original formatting code. The returned file was retrieved and displayed by WordPerfect. An independent libwpd check verified the returned text and both attributes.
 
 While testing that return path, WordPerfect inserted retrieved content into the nonempty document at the active cursor. X16Perfect currently replaces its document after a discard prompt, a confirmed muscle-memory gap. The test covered a small bold-and-underline document. It did not establish complex-document interoperability.
 
-The release PRG rebuilt byte for byte from a clean build. SHA-256 is `fbec2ca06a77d2d451e463fafb7b206f45772f6cd201b4427f37aa6b050b0a69`.
+The preview.2 release PRG rebuilt byte for byte from a clean build. SHA-256 is `fbec2ca06a77d2d451e463fafb7b206f45772f6cd201b4427f37aa6b050b0a69`.

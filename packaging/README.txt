@@ -7,7 +7,7 @@ X16Perfect for Commander X16
 3. Double-click RUN-WINDOWS.bat beside X16PERF.PRG.
 
 Documents are saved in the folder beside X16PERF.PRG. F5 lists files.
-F10 saves to a fresh filename.
+F10 saves. If the name already exists, press Y to replace it or Enter to keep it.
 
 Source and documentation:
 https://github.com/oodler577/X16Perflect

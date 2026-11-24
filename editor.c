@@ -360,7 +360,7 @@ static bool confirm(const char *question)
 static bool valid_name(const char *name)
 {
     unsigned char c;
-    if (!*name) return false;
+    if (!*name || !strcmp(name, ".") || !strcmp(name, "..")) return false;
     while ((c = *name++) != 0)
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
               (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
@@ -370,16 +370,26 @@ static bool valid_name(const char *name)
 
 static bool save(void)
 {
-    char name[21];
+    char name[21], question[40];
+    DocSaveResult result;
     strcpy(name, filename);
-    if (!prompt("Save as (new filename)", name, 20)) return false;
+    if (!prompt("Document to be saved:", name, 20)) return false;
     if (!valid_name(name)) {
         message("Use letters, numbers, dots, underscores or hyphens");
         return false;
     }
-    if (doc_save(name)) {
+    result = doc_save(name, false);
+    if (result == DOC_SAVE_EXISTS) {
+        strcpy(question, "Replace ");
+        strcat(question, name);
+        strcat(question, "? No (Yes)");
+        if (!confirm(question)) return false;
+        result = doc_save(name, true);
+    }
+    if (result == DOC_SAVE_OK) {
         strcpy(filename, name);
-        message("Document saved");
+        if (doc_error) message(doc_error);
+        else message("Document saved");
         return true;
     } else {
         message(doc_error);

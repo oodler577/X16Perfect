@@ -66,7 +66,7 @@ int main(void)
         return 4;
     }
     start = ticks();
-    if (!doc_save("LARGEOUT.WPD")) {
+    if (doc_save("LARGEOUT.WPD", false) != DOC_SAVE_OK) {
         line(doc_error);
         return 5;
     }

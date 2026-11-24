@@ -22,8 +22,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y cc65
-      - name: Build application and storage diagnostic
-        run: make X16PERF.PRG STORAGE.PRG
+      - name: Build application and storage diagnostics
+        run: make X16PERF.PRG STORAGE.PRG SAVETEST.PRG
       - name: Create Windows ZIP
         run: python3 scripts/package.py dist/X16Perfect-Windows.zip
       - uses: actions/upload-artifact@v4

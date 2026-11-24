@@ -4,7 +4,7 @@ X16Perfect is a native 65C02 WordPerfect-compatible editor milestone for the Com
 
 ## Windows quick start
 
-Download the [Windows build of X16Emu R49](https://github.com/X16Community/x16-emulator/releases/tag/r49) separately. Extract the X16Perfect ZIP into its own folder directly inside the emulator directory. Keep `x16emu.exe`, `rom.bin`, and the emulator DLLs together in that parent directory. Double-click `RUN-WINDOWS.bat` next to `X16PERF.PRG`. The launcher uses 8 MHz, 512 KiB of RAM, and 2× display scaling. Files opened or saved through device 8 are next to the PRG. Use F5 to list files and F10 to save under a new filename.
+Download the [Windows build of X16Emu R49](https://github.com/X16Community/x16-emulator/releases/tag/r49) separately. Extract the X16Perfect ZIP into its own folder directly inside the emulator directory. Keep `x16emu.exe`, `rom.bin`, and the emulator DLLs together in that parent directory. Double-click `RUN-WINDOWS.bat` next to `X16PERF.PRG`. The launcher uses 8 MHz, 512 KiB of RAM, and 2× display scaling. Files opened or saved through device 8 are next to the PRG. Use F5 to list files and F10 to save.
 
 ## Build and run
 
@@ -28,7 +28,7 @@ RUN
 - F3 opens Commands. Choose R to retrieve, L for layout commands, P for Print, S for Printer Setup, or N for New. F5 opens a list of up to 24 accessible files. Enter selects a file. F1 cancels modal prompts.
 - F6 toggles bold and F8 toggles underline. X16Perfect represents these with text colors. Alt+F3 or F11 toggles the inline code view. Use Left/Right to move across code records and Backspace to remove a record to the left.
 - F2 performs literal forward search. Shift+F2 can replace a single match. Alt+F4 or F12 marks a block, with a 2 KiB clipboard available through Ctrl+C, Ctrl+X and Ctrl+V.
-- F10 saves to a fresh filename. To save edits to a retrieved document, supply a distinct filename. Existing files are protected. A failed write may leave a partial new file. F7 offers to save unsaved edits, then asks for exit confirmation.
+- F10 offers the current filename. Accept it with Enter, or enter another name. If that file exists, press Y to replace it. Enter defaults to No and F1 or Esc cancels. Replacement writes a complete temporary copy before moving the original. F7 offers to save unsaved edits, then asks for exit confirmation.
 - Layout entries insert document margin records and hard page breaks. Margin fields use integer 1200ths of an inch. The editor’s screen wrap has its own dimensions.
 - Shift+F7 opens Print. Print and Printer Setup are navigable, intentionally inactive menus. They perform no output or device configuration.
 

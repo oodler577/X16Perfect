@@ -14,7 +14,13 @@ bool doc_replace(Pos first, Pos last, const void *bytes, unsigned count);
 void doc_delete(Pos first, Pos last);
 void doc_clear(void);
 bool doc_load(const char *name);
-bool doc_save(const char *name);
+typedef enum {
+    DOC_SAVE_OK,
+    DOC_SAVE_EXISTS,
+    DOC_SAVE_FAILED
+} DocSaveResult;
+
+DocSaveResult doc_save(const char *name, bool replace_existing);
 unsigned doc_token(Pos position);
 Pos doc_previous(Pos position);
 
