@@ -68,13 +68,19 @@ jobs:
               exit 0
             fi
           else
-            flags=()
-            if [[ "$RELEASE_TAG" == *-* ]]; then
+            title="X16Perfect $RELEASE_TAG"
+            flags=(--notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip into its own folder directly under your separate X16Emu R49 installation, then double-click RUN-WINDOWS.bat.')
+            if [[ "$RELEASE_TAG" == *-beta.* ]]; then
+              title="X16Perfect ${RELEASE_TAG%%-beta.*} Beta ${RELEASE_TAG##*-beta.}"
+              flags=(--latest=false --notes-from-tag)
+            elif [[ "$RELEASE_TAG" == *-* ]]; then
               flags+=(--prerelease --latest=false)
             fi
-            gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" \
-              --title "X16Perfect $RELEASE_TAG" \
-              --notes 'Download X16PERF.PRG for the Commander X16. On Windows, extract X16Perfect-Windows.zip into its own folder directly under your separate X16Emu R49 installation, then double-click RUN-WINDOWS.bat.'
+            gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" --title "$title"
           fi
           gh release upload "$RELEASE_TAG" "$prg" "$windows" --clobber
-          gh release edit "$RELEASE_TAG" --draft=false
+          if [[ "$RELEASE_TAG" == *-beta.* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false
+          fi

@@ -13,6 +13,8 @@ def package(destination):
         "X16PERF.PRG": ROOT / "X16PERF.PRG",
         "RUN-WINDOWS.bat": ROOT / "RUN-WINDOWS.bat",
         "README.txt": ROOT / "packaging" / "README.txt",
+        "FORMAT.WPD": ROOT / "packaging" / "demos" / "FORMAT.WPD",
+        "WELCOME.TXT": ROOT / "packaging" / "demos" / "WELCOME.TXT",
     }
 
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -20,7 +22,7 @@ def package(destination):
     try:
         with ZipFile(pending, "w", ZIP_DEFLATED) as output:
             for name, path in bundle_files.items():
-                if name != "X16PERF.PRG":
+                if path.suffix.lower() in {".bat", ".txt"}:
                     text = path.read_text(encoding="ascii").replace("\n", "\r\n")
                     output.writestr(name, text.encode("ascii"))
                 else:

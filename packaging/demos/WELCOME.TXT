@@ -1,0 +1,7 @@
+Welcome to X16Perfect
+
+This is a plain ASCII file. Try opening it in an empty document.
+To try insertion, first open FORMAT.WPD. Move the cursor to the
+insertion point and retrieve WELCOME.TXT with Shift+F10.
+
+Use F10 with a new name, such as NOTES.WPD, to save the result.
